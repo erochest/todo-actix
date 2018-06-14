@@ -18,10 +18,10 @@ fn greeting(info: Path<(u32, String)>) -> impl Responder {
 }
 
 fn main() {
-    let port = env::var("PORT")
+    let port: usize = env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
-        .unwrap_or(8080usize);
+        .unwrap_or(8080);
     let sys = actix::System::new("todo-actix");
     let addr = format!("0.0.0.0:{}", &port);
 
