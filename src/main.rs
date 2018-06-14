@@ -23,7 +23,7 @@ fn main() {
         .and_then(|p| p.parse().ok())
         .unwrap_or(8080usize);
     let sys = actix::System::new("todo-actix");
-    let addr = format!("127.0.0.1:{}", &port);
+    let addr = format!("0.0.0.0:{}", &port);
 
     server::new(|| {
         App::new()
