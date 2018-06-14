@@ -5,7 +5,7 @@ extern crate serde_derive;
 extern crate serde_json;
 
 use actix_web::{server, App, HttpRequest, HttpResponse, Json, Path, Responder, Result};
-use actix_web::http::{header, Method, StatusCode};
+use actix_web::http::{header, Method};
 use actix_web::middleware::cors;
 use std::env;
 
@@ -15,15 +15,16 @@ struct Message {
 }
 
 fn index(mut _req: HttpRequest) -> Result<HttpResponse> {
-    Ok(
-        HttpResponse::build(StatusCode::OK)
-            .content_type("text/plain")
-            .body("Hello, world!"),
-    )
+    let messages: Vec<Message> = vec![];
+    Ok(HttpResponse::Ok().json(messages))
 }
 
 fn post_message(input: Json<Message>) -> impl Responder {
     HttpResponse::Ok().json(input.0)
+}
+
+fn delete_message(mut _req: HttpRequest) -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok().finish())
 }
 
 fn greeting(info: Path<(u32, String)>) -> impl Responder {
@@ -61,6 +62,7 @@ fn build_app() -> App {
                 .resource("/", |r| {
                     r.get().f(index);
                     r.post().with(post_message);
+                    r.delete().f(delete_message);
                 })
                 .register()
         })
