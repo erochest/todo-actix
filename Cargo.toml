@@ -1,6 +1,8 @@
 [package]
 name = "todo-actix"
 version = "0.1.0"
-authors = ["Eric Rochester <eric.rochester@willowtreeapps.com>"]
+authors = ["Eric Rochester <erochest@gmail.com>"]
 
 [dependencies]
+actix = "0.5.8"
+actix-web = "0.6.13"
