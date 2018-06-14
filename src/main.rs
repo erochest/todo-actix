@@ -1,10 +1,18 @@
 extern crate actix;
 extern crate actix_web;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
-use actix_web::{server, App, HttpRequest, HttpResponse, Path, Responder, Result};
+use actix_web::{server, App, HttpRequest, HttpResponse, Json, Path, Responder, Result};
 use actix_web::http::{header, Method, StatusCode};
 use actix_web::middleware::cors;
 use std::env;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Message {
+    title: String,
+}
 
 fn index(mut _req: HttpRequest) -> Result<HttpResponse> {
     Ok(
@@ -12,6 +20,10 @@ fn index(mut _req: HttpRequest) -> Result<HttpResponse> {
             .content_type("text/plain")
             .body("Hello, world!"),
     )
+}
+
+fn post_message(input: Json<Message>) -> impl Responder {
+    HttpResponse::Ok().json(input.0)
 }
 
 fn greeting(info: Path<(u32, String)>) -> impl Responder {
@@ -46,7 +58,10 @@ fn build_app() -> App {
                 .allowed_header(header::CONTENT_TYPE)
                 .max_age(3600)
                 .resource("/greeting/{id}/{name}/", |r| r.method(Method::GET).with(greeting))
-                .resource("/", |r| r.f(index))
+                .resource("/", |r| {
+                    r.get().f(index);
+                    r.post().with(post_message);
+                })
                 .register()
         })
 }
