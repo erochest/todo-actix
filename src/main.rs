@@ -40,7 +40,9 @@ fn build_app() -> App {
     App::new()
         .configure(|app| {
             cors::Cors::for_app(app)
-                .allowed_origin("*")
+                .allowed_origin("https://www.todobackend.com")
+                .allowed_methods(vec!["GET", "POST", "DELETE"])
+                .allowed_headers(vec![header::CONTENT_TYPE])
                 .allowed_header(header::CONTENT_TYPE)
                 .max_age(3600)
                 .resource("/greeting/{id}/{name}/", |r| r.method(Method::GET).with(greeting))
