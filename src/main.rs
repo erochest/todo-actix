@@ -5,15 +5,30 @@ extern crate futures;
 extern crate serde_derive;
 extern crate serde_json;
 
-use actix_web::http::{header, Method};
+use actix_web::http::header;
 use actix_web::middleware::cors;
-use actix_web::{server, App, HttpRequest, HttpResponse, Json, Path, Responder, Result};
+use actix_web::{server, App, HttpRequest, HttpResponse, Json, Result};
 use std::env;
 use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+struct TodoInput {
+    title: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 struct Todo {
     title: String,
+    completed: bool,
+}
+
+impl From<TodoInput> for Todo {
+    fn from(input: TodoInput) -> Todo {
+        Todo {
+            title: input.title,
+            completed: false,
+        }
+    }
 }
 
 struct TodoCollection {
@@ -32,13 +47,14 @@ fn index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(&*todos))
 }
 
-fn post_index((todo, req): (Json<Todo>, HttpRequest<TodoCollection>)) -> Result<HttpResponse> {
+fn post_index((todo, req): (Json<TodoInput>, HttpRequest<TodoCollection>)) -> Result<HttpResponse> {
+    let todo: Todo = todo.0.into();
     let todos = Arc::clone(&req.state().todos);
     {
         let mut todos = todos.write().unwrap();
-        todos.push(todo.0.clone());
+        todos.push(todo.clone());
     }
-    Ok(HttpResponse::Ok().json(todo.0))
+    Ok(HttpResponse::Ok().json(todo))
 }
 
 fn delete_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
