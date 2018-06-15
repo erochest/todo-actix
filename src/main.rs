@@ -20,6 +20,7 @@ struct TodoInput {
 struct Todo {
     title: String,
     completed: bool,
+    url: String,
 }
 
 impl From<TodoInput> for Todo {
@@ -27,6 +28,7 @@ impl From<TodoInput> for Todo {
         Todo {
             title: input.title,
             completed: false,
+            url: String::default(),
         }
     }
 }
