@@ -48,10 +48,6 @@ fn delete_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().finish())
 }
 
-fn greeting(info: Path<(u32, String)>) -> impl Responder {
-    format!("Greetings, {}. (ID {})", info.1, info.0)
-}
-
 fn main() {
     let port: usize = env::var("PORT")
         .ok()
@@ -80,9 +76,6 @@ fn build_app(todos: Arc<RwLock<Vec<Todo>>>) -> App<TodoCollection> {
             .allowed_headers(vec![header::CONTENT_TYPE])
             .allowed_header(header::CONTENT_TYPE)
             .max_age(3600)
-            .resource("/greeting/{id}/{name}/", |r| {
-                r.method(Method::GET).with(greeting)
-            })
             .resource("/", |r| {
                 r.get().with(index);
                 r.post().with(post_index);
