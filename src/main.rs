@@ -1,3 +1,10 @@
+// TODO: library
+// TODO: modules
+// TODO: next_id has to be stored here as well and passed into build_app so it will synchronize across threads.
+// TODO: spawn a repository in a separate thread and use channels to communicate
+// TODO: use a for-real database
+// TODO: go all-in on hal
+
 extern crate actix;
 extern crate actix_web;
 extern crate futures;
