@@ -4,12 +4,16 @@ extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate url;
+extern crate url_serde;
 
 use actix_web::http::header;
 use actix_web::middleware::cors;
-use actix_web::{server, App, HttpRequest, HttpResponse, Json, Result};
+use actix_web::{server, App, HttpRequest, HttpResponse, Json, Path, Result};
 use std::env;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
+use url::Url;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct TodoInput {
@@ -18,39 +22,59 @@ struct TodoInput {
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct Todo {
+    id: usize,
     title: String,
     completed: bool,
-    url: String,
+    #[serde(with = "url_serde")]
+    url: Url,
+}
+
+impl Todo {
+    fn new(id: usize, title: String, url: Url) -> Todo {
+        Todo {
+            id,
+            title,
+            completed: false,
+            url,
+        }
+    }
 }
 
 impl From<TodoInput> for Todo {
     fn from(input: TodoInput) -> Todo {
         Todo {
+            id: 0,
             title: input.title,
             completed: false,
-            url: String::default(),
+            url: "/".parse().unwrap(),
         }
     }
 }
 
 struct TodoCollection {
-    pub todos: Arc<RwLock<Vec<Todo>>>,
+    next_id: Arc<AtomicUsize>,
+    todos: Arc<RwLock<Vec<Todo>>>,
 }
 
 impl TodoCollection {
     fn new(todos: Arc<RwLock<Vec<Todo>>>) -> TodoCollection {
-        TodoCollection { todos }
+        TodoCollection {
+            next_id: Arc::new(AtomicUsize::new(0)),
+            todos,
+        }
     }
 }
 
-fn index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
+fn get_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
     let todos = Arc::clone(&req.state().todos);
     let todos = todos.read().unwrap();
     Ok(HttpResponse::Ok().json(&*todos))
 }
 
 fn post_index((todo, req): (Json<TodoInput>, HttpRequest<TodoCollection>)) -> Result<HttpResponse> {
-    let todo: Todo = todo.0.into();
+    let next_id = Arc::clone(&req.state().next_id).fetch_add(1, Ordering::Relaxed);
+    let url = req.url_for("todo", &[format!("{}", next_id)]).unwrap();
+    let todo = Todo::new(next_id, todo.0.title, url);
     let todos = Arc::clone(&req.state().todos);
     {
         let mut todos = todos.write().unwrap();
@@ -64,6 +88,15 @@ fn delete_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
     let mut todos = todos.write().unwrap();
     todos.clear();
     Ok(HttpResponse::Ok().finish())
+}
+
+fn get_todo((todo_id, req): (Path<usize>, HttpRequest<TodoCollection>)) -> Result<HttpResponse> {
+    let todo_id = *todo_id;
+    let todos = Arc::clone(&req.state().todos);
+    let todos = todos.read().unwrap();
+    let todo = todos.iter().filter(|t| t.id == todo_id).nth(0);
+    Ok(todo.map(|t| HttpResponse::Ok().json(t))
+        .unwrap_or_else(|| HttpResponse::NotFound().finish()))
 }
 
 fn main() {
@@ -94,8 +127,12 @@ fn build_app(todos: Arc<RwLock<Vec<Todo>>>) -> App<TodoCollection> {
             .allowed_headers(vec![header::CONTENT_TYPE])
             .allowed_header(header::CONTENT_TYPE)
             .max_age(3600)
+            .resource("/{id}", |r| {
+                r.name("todo");
+                r.get().with(get_todo);
+            })
             .resource("/", |r| {
-                r.get().with(index);
+                r.get().with(get_index);
                 r.post().with(post_index);
                 r.delete().f(delete_index);
             })
