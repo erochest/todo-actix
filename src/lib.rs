@@ -1,4 +1,3 @@
-// TODO: modules
 // TODO: next_id has to be stored here as well and passed into build_app so it will synchronize across threads.
 // TODO: spawn a repository in a separate thread and use channels to communicate
 // TODO: use a for-real database
@@ -12,12 +11,15 @@ extern crate serde_json;
 extern crate url;
 extern crate url_serde;
 
+mod collection;
+mod todo;
+
 use actix_web::http::header;
 use actix_web::middleware::cors;
-use actix_web::{server, App, HttpRequest, HttpResponse, Json, Path, Result};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use actix_web::{server, App};
+use collection::{delete_index, get_index, post_index, TodoCollection};
 use std::sync::{Arc, RwLock};
-use url::Url;
+use todo::{get_todo, Todo};
 
 pub fn run(address: String) {
     let sys = actix::System::new("todo-actix");
@@ -53,88 +55,4 @@ fn build_app(todos: Arc<RwLock<Vec<Todo>>>) -> App<TodoCollection> {
             })
             .register()
     })
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct TodoInput {
-    title: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-struct Todo {
-    id: usize,
-    title: String,
-    completed: bool,
-    #[serde(with = "url_serde")]
-    url: Url,
-}
-
-impl Todo {
-    fn new(id: usize, title: String, url: Url) -> Todo {
-        Todo {
-            id,
-            title,
-            completed: false,
-            url,
-        }
-    }
-}
-
-impl From<TodoInput> for Todo {
-    fn from(input: TodoInput) -> Todo {
-        Todo {
-            id: 0,
-            title: input.title,
-            completed: false,
-            url: "/".parse().unwrap(),
-        }
-    }
-}
-
-struct TodoCollection {
-    next_id: Arc<AtomicUsize>,
-    todos: Arc<RwLock<Vec<Todo>>>,
-}
-
-impl TodoCollection {
-    fn new(todos: Arc<RwLock<Vec<Todo>>>) -> TodoCollection {
-        TodoCollection {
-            next_id: Arc::new(AtomicUsize::new(0)),
-            todos,
-        }
-    }
-}
-
-fn get_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
-    let todos = Arc::clone(&req.state().todos);
-    let todos = todos.read().unwrap();
-    Ok(HttpResponse::Ok().json(&*todos))
-}
-
-fn post_index((todo, req): (Json<TodoInput>, HttpRequest<TodoCollection>)) -> Result<HttpResponse> {
-    let next_id = Arc::clone(&req.state().next_id).fetch_add(1, Ordering::Relaxed);
-    let url = req.url_for("todo", &[format!("{}", next_id)]).unwrap();
-    let todo = Todo::new(next_id, todo.0.title, url);
-    let todos = Arc::clone(&req.state().todos);
-    {
-        let mut todos = todos.write().unwrap();
-        todos.push(todo.clone());
-    }
-    Ok(HttpResponse::Ok().json(todo))
-}
-
-fn delete_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
-    let todos = Arc::clone(&req.state().todos);
-    let mut todos = todos.write().unwrap();
-    todos.clear();
-    Ok(HttpResponse::Ok().finish())
-}
-
-fn get_todo((todo_id, req): (Path<usize>, HttpRequest<TodoCollection>)) -> Result<HttpResponse> {
-    let todo_id = *todo_id;
-    let todos = Arc::clone(&req.state().todos);
-    let todos = todos.read().unwrap();
-    let todo = todos.iter().filter(|t| t.id == todo_id).nth(0);
-    Ok(todo.map(|t| HttpResponse::Ok().json(t))
-        .unwrap_or_else(|| HttpResponse::NotFound().finish()))
 }
