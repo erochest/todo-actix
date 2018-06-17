@@ -3,16 +3,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 use todo::{Todo, TodoInput};
 
+#[derive(Clone)]
 pub struct TodoCollection {
     pub next_id: Arc<AtomicUsize>,
     pub todos: Arc<RwLock<Vec<Todo>>>,
 }
 
 impl TodoCollection {
-    pub fn new(todos: Arc<RwLock<Vec<Todo>>>) -> TodoCollection {
+    pub fn new() -> TodoCollection {
         TodoCollection {
             next_id: Arc::new(AtomicUsize::new(0)),
-            todos,
+            todos: Arc::new(RwLock::new(Vec::new())),
         }
     }
 }

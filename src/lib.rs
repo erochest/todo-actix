@@ -1,4 +1,3 @@
-// TODO: next_id has to be stored here as well and passed into build_app so it will synchronize across threads.
 // TODO: spawn a repository in a separate thread and use channels to communicate
 // TODO: use a for-real database
 // TODO: go all-in on hal
@@ -23,10 +22,10 @@ use todo::{get_todo, Todo};
 
 pub fn run(address: String) {
     let sys = actix::System::new("todo-actix");
-    let todos = Arc::new(RwLock::new(Vec::new()));
-    let todos_cloned = Arc::clone(&todos);
+    let collection = TodoCollection::new();
+    let col_clone = collection.clone();
 
-    server::new(move || build_app(Arc::clone(&todos_cloned)))
+    server::new(move || build_app(col_clone.clone()))
         .bind(&address)
         .expect(&format!("Cannot bind to {}", &address))
         .shutdown_timeout(0)
@@ -36,8 +35,8 @@ pub fn run(address: String) {
     let _ = sys.run();
 }
 
-fn build_app(todos: Arc<RwLock<Vec<Todo>>>) -> App<TodoCollection> {
-    App::with_state(TodoCollection::new(todos)).configure(|app| {
+fn build_app(collection: TodoCollection) -> App<TodoCollection> {
+    App::with_state(collection).configure(|app| {
         cors::Cors::for_app(app)
             .allowed_origin("https://www.todobackend.com")
             .allowed_methods(vec!["GET", "POST", "DELETE"])
