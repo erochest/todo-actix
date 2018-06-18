@@ -1,6 +1,5 @@
 use actix_web::{HttpRequest, HttpResponse, Path, Result};
-use collection::TodoCollection;
-use std::sync::Arc;
+use collection::TodoClient;
 use url::Url;
 use url_serde;
 
@@ -40,13 +39,9 @@ impl From<TodoInput> for Todo {
     }
 }
 
-pub fn get_todo(
-    (todo_id, req): (Path<usize>, HttpRequest<TodoCollection>),
-) -> Result<HttpResponse> {
-    let todo_id = *todo_id;
-    let todos = Arc::clone(&req.state().todos);
-    let todos = todos.read().unwrap();
-    let todo = todos.iter().filter(|t| t.id == todo_id).nth(0);
-    Ok(todo.map(|t| HttpResponse::Ok().json(t))
+pub fn get_todo((todo_id, req): (Path<usize>, HttpRequest<TodoClient>)) -> Result<HttpResponse> {
+    Ok(req.state()
+        .get_item(todo_id.into_inner())
+        .map(|todo| HttpResponse::Ok().json(todo))
         .unwrap_or_else(|| HttpResponse::NotFound().finish()))
 }

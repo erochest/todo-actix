@@ -1,46 +1,120 @@
 use actix_web::{HttpRequest, HttpResponse, Json, Result};
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::mpsc::{sync_channel, SyncSender};
 use todo::{Todo, TodoInput};
 
-#[derive(Clone)]
+#[derive(Debug)]
+pub enum CollectionMessages {
+    GetList(SyncSender<Vec<Todo>>),
+    PostList(TodoInput, String, SyncSender<Todo>),
+    DeleteList(SyncSender<bool>),
+    GetItem(usize, SyncSender<Option<Todo>>),
+}
+
+/// This runs in one thread and takes requests sequentially from clients.
 pub struct TodoCollection {
-    pub next_id: Arc<AtomicUsize>,
-    pub todos: Arc<RwLock<Vec<Todo>>>,
+    pub next_id: usize,
+    pub todos: Vec<Todo>,
 }
 
 impl TodoCollection {
     pub fn new() -> TodoCollection {
         TodoCollection {
-            next_id: Arc::new(AtomicUsize::new(0)),
-            todos: Arc::new(RwLock::new(Vec::new())),
+            next_id: 0,
+            todos: Vec::new(),
         }
+    }
+
+    pub fn execute(&mut self, message: CollectionMessages) {
+        let _ = match message {
+            CollectionMessages::GetList(tx) => tx.send(self.get_list()).unwrap(),
+            CollectionMessages::PostList(todo_input, url_template, tx) => {
+                tx.send(self.post_list(todo_input, url_template)).unwrap()
+            }
+            CollectionMessages::DeleteList(tx) => tx.send(self.delete_list()).unwrap(),
+            CollectionMessages::GetItem(id, tx) => tx.send(self.get_item(id)).unwrap(),
+        };
+    }
+
+    fn get_list(&self) -> Vec<Todo> {
+        self.todos.clone()
+    }
+
+    fn post_list(&mut self, todo_input: TodoInput, url_template: String) -> Todo {
+        let id = self.next_id;
+        let url = url_template.replace("ID", &id.to_string()).parse().unwrap();
+        let todo = Todo::new(id, todo_input.title, url);
+        self.next_id += 1;
+        self.todos.push(todo.clone());
+        todo
+    }
+
+    fn delete_list(&mut self) -> bool {
+        self.todos.clear();
+        true
+    }
+
+    fn get_item(&self, id: usize) -> Option<Todo> {
+        self.todos
+            .iter()
+            .filter(|todo| todo.id == id)
+            .nth(0)
+            .map(|todo| todo.clone())
     }
 }
 
-pub fn get_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
-    let todos = Arc::clone(&req.state().todos);
-    let todos = todos.read().unwrap();
+/// This runs in the server threads and takes responses from servers.
+#[derive(Clone)]
+pub struct TodoClient {
+    pub tx: SyncSender<CollectionMessages>,
+}
+
+impl TodoClient {
+    pub fn new(tx: SyncSender<CollectionMessages>) -> TodoClient {
+        TodoClient { tx }
+    }
+
+    fn send_message<R, F>(&self, message_builder: F) -> R
+    where
+        F: FnOnce(SyncSender<R>) -> CollectionMessages,
+    {
+        let (tx, rx) = sync_channel(0);
+        let message = message_builder(tx);
+        self.tx.send(message).unwrap();
+        rx.recv().unwrap()
+    }
+
+    pub fn get_list(&self) -> Vec<Todo> {
+        self.send_message(|tx| CollectionMessages::GetList(tx))
+    }
+
+    pub fn post_list(&self, todo_input: TodoInput, url_template: String) -> Todo {
+        self.send_message(|tx| CollectionMessages::PostList(todo_input, url_template, tx))
+    }
+
+    pub fn delete_list(&self) -> bool {
+        self.send_message(|tx| CollectionMessages::DeleteList(tx))
+    }
+
+    pub fn get_item(&self, id: usize) -> Option<Todo> {
+        self.send_message(|tx| CollectionMessages::GetItem(id, tx))
+    }
+}
+
+pub fn get_index(req: HttpRequest<TodoClient>) -> Result<HttpResponse> {
+    let todos = &req.state().get_list();
     Ok(HttpResponse::Ok().json(&*todos))
 }
 
-pub fn post_index(
-    (todo, req): (Json<TodoInput>, HttpRequest<TodoCollection>),
-) -> Result<HttpResponse> {
-    let next_id = Arc::clone(&req.state().next_id).fetch_add(1, Ordering::Relaxed);
-    let url = req.url_for("todo", &[format!("{}", next_id)]).unwrap();
-    let todo = Todo::new(next_id, todo.0.title, url);
-    let todos = Arc::clone(&req.state().todos);
-    {
-        let mut todos = todos.write().unwrap();
-        todos.push(todo.clone());
-    }
+pub fn post_index((todo, req): (Json<TodoInput>, HttpRequest<TodoClient>)) -> Result<HttpResponse> {
+    let url_template: String = req.url_for("todo", &[String::from("ID")])
+        .unwrap()
+        .as_str()
+        .into();
+    let todo = &req.state().post_list(todo.0, url_template);
     Ok(HttpResponse::Ok().json(todo))
 }
 
-pub fn delete_index(req: HttpRequest<TodoCollection>) -> Result<HttpResponse> {
-    let todos = Arc::clone(&req.state().todos);
-    let mut todos = todos.write().unwrap();
-    todos.clear();
+pub fn delete_index(req: HttpRequest<TodoClient>) -> Result<HttpResponse> {
+    let _ok = &req.state().delete_list();
     Ok(HttpResponse::Ok().finish())
 }

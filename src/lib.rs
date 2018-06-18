@@ -1,4 +1,6 @@
-// TODO: spawn a repository in a separate thread and use channels to communicate
+// TODO: use futures or actors for thread communication
+// TODO: logging
+// TODO: better error handling
 // TODO: use a for-real database
 // TODO: go all-in on hal
 
@@ -16,16 +18,26 @@ mod todo;
 use actix_web::http::header;
 use actix_web::middleware::cors;
 use actix_web::{server, App};
-use collection::{delete_index, get_index, post_index, TodoCollection};
-use std::sync::{Arc, RwLock};
-use todo::{get_todo, Todo};
+use collection::{delete_index, get_index, post_index, TodoClient, TodoCollection};
+use std::sync::mpsc::sync_channel;
+use std::thread;
+use todo::get_todo;
 
 pub fn run(address: String) {
     let sys = actix::System::new("todo-actix");
-    let collection = TodoCollection::new();
-    let col_clone = collection.clone();
 
-    server::new(move || build_app(col_clone.clone()))
+    let (tx, rx) = sync_channel(1028);
+
+    thread::spawn(move || {
+        let mut todo_server = TodoCollection::new();
+        for msg in rx {
+            todo_server.execute(msg);
+        }
+    });
+
+    let client = TodoClient::new(tx);
+    let client_clone = client.clone();
+    server::new(move || build_app(client_clone.clone()))
         .bind(&address)
         .expect(&format!("Cannot bind to {}", &address))
         .shutdown_timeout(0)
@@ -35,8 +47,8 @@ pub fn run(address: String) {
     let _ = sys.run();
 }
 
-fn build_app(collection: TodoCollection) -> App<TodoCollection> {
-    App::with_state(collection).configure(|app| {
+fn build_app(client: TodoClient) -> App<TodoClient> {
+    App::with_state(client).configure(|app| {
         cors::Cors::for_app(app)
             .allowed_origin("https://www.todobackend.com")
             .allowed_methods(vec!["GET", "POST", "DELETE"])
