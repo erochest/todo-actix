@@ -48,7 +48,7 @@ impl TodoCollection {
     fn post_list(&mut self, todo_input: TodoInput, url_template: String) -> Todo {
         let id = self.next_id;
         let url = url_template.replace("ID", &id.to_string()).parse().unwrap();
-        let todo = Todo::new(id, todo_input.title, url);
+        let todo = Todo::new(id, todo_input.title, todo_input.order, url);
         self.next_id += 1;
         self.todos.push(todo.clone());
         todo

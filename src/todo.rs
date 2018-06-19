@@ -6,6 +6,7 @@ use url_serde;
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TodoInput {
     pub title: String,
+    pub order: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -19,16 +20,18 @@ pub struct Todo {
     pub id: usize,
     pub title: String,
     pub completed: bool,
+    pub order: Option<u32>,
     #[serde(with = "url_serde")]
     pub url: Url,
 }
 
 impl Todo {
-    pub fn new(id: usize, title: String, url: Url) -> Todo {
+    pub fn new(id: usize, title: String, order: Option<u32>, url: Url) -> Todo {
         Todo {
             id,
             title,
             completed: false,
+            order,
             url,
         }
     }
@@ -40,6 +43,7 @@ impl From<TodoInput> for Todo {
             id: 0,
             title: input.title,
             completed: false,
+            order: input.order,
             url: "/".parse().unwrap(),
         }
     }
