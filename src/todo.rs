@@ -13,6 +13,7 @@ pub struct TodoInput {
 pub struct TodoEdit {
     pub title: Option<String>,
     pub completed: Option<bool>,
+    pub order: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

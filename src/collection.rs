@@ -94,6 +94,7 @@ impl TodoCollection {
                     .completed
                     .iter()
                     .for_each(|completed| todo.completed = *completed);
+                todo.order = todo_edit.order.or(todo.order);
                 todo
             })
             .map(|todo| todo.clone())
