@@ -1,15 +1,14 @@
 use actix_web::{HttpRequest, HttpResponse, Json, Result};
 use std::sync::mpsc::{sync_channel, SyncSender};
-use todo::{Todo, TodoInput};
+use todo::{Todo, TodoEdit, TodoInput};
 
-// TODO: Refactor these to be wrapped in a NeedsReply type that has the SyncSender.
 #[derive(Debug)]
 pub enum CollectionMessages {
     GetList(SyncSender<Vec<Todo>>),
     PostList(TodoInput, String, SyncSender<Todo>),
     DeleteList(SyncSender<bool>),
     GetItem(usize, SyncSender<Option<Todo>>),
-    PatchItem(usize, TodoInput, SyncSender<Option<Todo>>),
+    PatchItem(usize, TodoEdit, SyncSender<Option<Todo>>),
 }
 
 /// This runs in one thread and takes requests sequentially from clients.
@@ -34,8 +33,8 @@ impl TodoCollection {
             }
             CollectionMessages::DeleteList(tx) => tx.send(self.delete_list()).unwrap(),
             CollectionMessages::GetItem(id, tx) => tx.send(self.get_item(id)).unwrap(),
-            CollectionMessages::PatchItem(id, todo_input, tx) => {
-                tx.send(self.patch_item(id, todo_input)).unwrap()
+            CollectionMessages::PatchItem(id, todo_edit, tx) => {
+                tx.send(self.patch_item(id, todo_edit)).unwrap()
             }
         };
     }
@@ -66,14 +65,20 @@ impl TodoCollection {
             .map(|todo| todo.clone())
     }
 
-    fn patch_item(&mut self, id: usize, todo_input: TodoInput) -> Option<Todo> {
-        let title = todo_input.title.clone();
+    fn patch_item(&mut self, id: usize, todo_edit: TodoEdit) -> Option<Todo> {
         self.todos
             .iter_mut()
             .filter(|todo| todo.id == id)
             .nth(0)
             .map(move |todo| {
-                todo.title = title.clone();
+                todo_edit
+                    .title
+                    .iter()
+                    .for_each(|title| todo.title = title.to_string());
+                todo_edit
+                    .completed
+                    .iter()
+                    .for_each(|completed| todo.completed = *completed);
                 todo
             })
             .map(|todo| todo.clone())
@@ -117,8 +122,8 @@ impl TodoClient {
         self.send_message(|tx| CollectionMessages::GetItem(id, tx))
     }
 
-    pub fn patch_item(&self, id: usize, todo_input: TodoInput) -> Option<Todo> {
-        self.send_message(|tx| CollectionMessages::PatchItem(id, todo_input, tx))
+    pub fn patch_item(&self, id: usize, todo_edit: TodoEdit) -> Option<Todo> {
+        self.send_message(|tx| CollectionMessages::PatchItem(id, todo_edit, tx))
     }
 }
 

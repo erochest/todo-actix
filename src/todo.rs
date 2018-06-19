@@ -9,6 +9,12 @@ pub struct TodoInput {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TodoEdit {
+    pub title: Option<String>,
+    pub completed: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Todo {
     pub id: usize,
     pub title: String,
@@ -47,10 +53,10 @@ pub fn get_todo((todo_id, req): (Path<usize>, HttpRequest<TodoClient>)) -> Resul
 }
 
 pub fn patch_todo(
-    (todo_id, todo_input, req): (Path<usize>, Json<TodoInput>, HttpRequest<TodoClient>),
+    (todo_id, todo_edit, req): (Path<usize>, Json<TodoEdit>, HttpRequest<TodoClient>),
 ) -> Result<HttpResponse> {
     Ok(req.state()
-        .patch_item(todo_id.into_inner(), todo_input.0)
+        .patch_item(todo_id.into_inner(), todo_edit.0)
         .map(|todo| HttpResponse::Ok().json(todo))
         .unwrap_or_else(|| HttpResponse::NotFound().finish()))
 }
