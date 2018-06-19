@@ -1,4 +1,4 @@
-use actix_web::{HttpRequest, HttpResponse, Path, Result};
+use actix_web::{HttpRequest, HttpResponse, Json, Path, Result};
 use collection::TodoClient;
 use url::Url;
 use url_serde;
@@ -42,6 +42,15 @@ impl From<TodoInput> for Todo {
 pub fn get_todo((todo_id, req): (Path<usize>, HttpRequest<TodoClient>)) -> Result<HttpResponse> {
     Ok(req.state()
         .get_item(todo_id.into_inner())
+        .map(|todo| HttpResponse::Ok().json(todo))
+        .unwrap_or_else(|| HttpResponse::NotFound().finish()))
+}
+
+pub fn patch_todo(
+    (todo_id, todo_input, req): (Path<usize>, Json<TodoInput>, HttpRequest<TodoClient>),
+) -> Result<HttpResponse> {
+    Ok(req.state()
+        .patch_item(todo_id.into_inner(), todo_input.0)
         .map(|todo| HttpResponse::Ok().json(todo))
         .unwrap_or_else(|| HttpResponse::NotFound().finish()))
 }
