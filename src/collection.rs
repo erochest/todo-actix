@@ -8,6 +8,7 @@ pub enum CollectionMessages {
     PostList(TodoInput, String, SyncSender<Todo>),
     DeleteList(SyncSender<bool>),
     GetItem(usize, SyncSender<Option<Todo>>),
+    DeleteItem(usize, SyncSender<Option<bool>>),
     PatchItem(usize, TodoEdit, SyncSender<Option<Todo>>),
 }
 
@@ -33,6 +34,7 @@ impl TodoCollection {
             }
             CollectionMessages::DeleteList(tx) => tx.send(self.delete_list()).unwrap(),
             CollectionMessages::GetItem(id, tx) => tx.send(self.get_item(id)).unwrap(),
+            CollectionMessages::DeleteItem(id, tx) => tx.send(self.delete_item(id)).unwrap(),
             CollectionMessages::PatchItem(id, todo_edit, tx) => {
                 tx.send(self.patch_item(id, todo_edit)).unwrap()
             }
@@ -57,12 +59,26 @@ impl TodoCollection {
         true
     }
 
-    fn get_item(&self, id: usize) -> Option<Todo> {
+    fn find(&self, id: usize) -> Option<(usize, &Todo)> {
         self.todos
             .iter()
-            .filter(|todo| todo.id == id)
+            .enumerate()
+            .filter(|(_i, todo)| todo.id == id)
             .nth(0)
-            .map(|todo| todo.clone())
+    }
+
+    fn get_item(&self, id: usize) -> Option<Todo> {
+        self.find(id).map(|(_i, todo)| todo.clone())
+    }
+
+    fn delete_item(&mut self, id: usize) -> Option<bool> {
+        let original_size = self.todos.len();
+        self.todos.retain(|todo| todo.id != id);
+        if original_size > self.todos.len() {
+            Some(true)
+        } else {
+            None
+        }
     }
 
     fn patch_item(&mut self, id: usize, todo_edit: TodoEdit) -> Option<Todo> {
@@ -120,6 +136,10 @@ impl TodoClient {
 
     pub fn get_item(&self, id: usize) -> Option<Todo> {
         self.send_message(|tx| CollectionMessages::GetItem(id, tx))
+    }
+
+    pub fn delete_item(&self, id: usize) -> Option<bool> {
+        self.send_message(|tx| CollectionMessages::DeleteItem(id, tx))
     }
 
     pub fn patch_item(&self, id: usize, todo_edit: TodoEdit) -> Option<Todo> {

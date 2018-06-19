@@ -52,6 +52,13 @@ pub fn get_todo((todo_id, req): (Path<usize>, HttpRequest<TodoClient>)) -> Resul
         .unwrap_or_else(|| HttpResponse::NotFound().finish()))
 }
 
+pub fn delete_todo((todo_id, req): (Path<usize>, HttpRequest<TodoClient>)) -> Result<HttpResponse> {
+    Ok(req.state()
+        .delete_item(todo_id.into_inner())
+        .map(|_flag| HttpResponse::Ok().finish())
+        .unwrap_or_else(|| HttpResponse::NotFound().finish()))
+}
+
 pub fn patch_todo(
     (todo_id, todo_edit, req): (Path<usize>, Json<TodoEdit>, HttpRequest<TodoClient>),
 ) -> Result<HttpResponse> {

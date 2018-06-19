@@ -21,7 +21,7 @@ use actix_web::{server, App};
 use collection::{delete_index, get_index, post_index, TodoClient, TodoCollection};
 use std::sync::mpsc::sync_channel;
 use std::thread;
-use todo::{get_todo, patch_todo};
+use todo::{delete_todo, get_todo, patch_todo};
 
 pub fn run(address: String) {
     env_logger::init();
@@ -61,6 +61,7 @@ fn build_app(client: TodoClient) -> App<TodoClient> {
                 .resource("/{id}", |r| {
                     r.name("todo");
                     r.get().with(get_todo);
+                    r.delete().with(delete_todo);
                     r.method(Method::PATCH).with(patch_todo);
                 })
                 .resource("/", |r| {
