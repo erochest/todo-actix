@@ -12,13 +12,15 @@ extern crate serde_json;
 extern crate url;
 extern crate url_serde;
 
+mod client;
 mod collection;
 mod todo;
 
 use actix_web::http::{header, Method};
 use actix_web::middleware::{cors, Logger};
 use actix_web::{server, App};
-use collection::{delete_index, get_index, post_index, TodoClient, TodoCollection};
+use client::{delete_index, get_index, post_index, TodoClient};
+use collection::TodoCollection;
 use std::sync::mpsc::sync_channel;
 use std::thread;
 use todo::{delete_todo, get_todo, patch_todo};

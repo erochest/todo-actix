@@ -1,5 +1,5 @@
 use actix_web::{HttpRequest, HttpResponse, Json, Path, Result};
-use collection::TodoClient;
+use client::TodoClient;
 use url::Url;
 use url_serde;
 
